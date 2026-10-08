@@ -36,6 +36,12 @@ of Michael Sipser's *Introduction to the Theory of Computation*, Chapter 1.
 > ![Simulation view](screenshots/simulate.png)
 > ```
 
+## Download (Windows, no Python needed)
+
+Grab the latest `AutomataTutor.exe` from the
+[**Releases page**](https://github.com/joscarmona804/automata-tutor/releases/latest)
+and double-click it. Nothing to install — hand it straight to a friend.
+
 ## Run from source
 
 Requirements:
