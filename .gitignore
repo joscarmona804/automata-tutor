@@ -1,0 +1,26 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- PyInstaller build artifacts ---
+build/
+dist/
+# Ignore auto-generated spec files, but keep our committed one if we add it.
+# Our hand-maintained spec (if any) should be named AutomataTutor.spec and
+# force-added with `git add -f AutomataTutor.spec`.
+*.spec
+!AutomataTutor.spec
+
+# --- Scratch / internal working files ---
+_*.py
+_CONTRACT.md
+
+# --- OS cruft ---
+.DS_Store
+Thumbs.db

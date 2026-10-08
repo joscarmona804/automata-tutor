@@ -1,0 +1,10 @@
+# Automata Tutor — dependencies
+#
+# RUNTIME: none.
+# The app runs on the Python standard library only. Tkinter ships with
+# CPython, so a stock Python 3.10+ install is all you need to run `app.py`.
+#
+# BUILD / DEV ONLY (not required to run the game):
+# Used to produce a standalone Windows .exe. Install with:
+#   pip install -r requirements.txt
+# pyinstaller>=6.0
