@@ -5,6 +5,8 @@
 # CPython, so a stock Python 3.10+ install is all you need to run `app.py`.
 #
 # BUILD / DEV ONLY (not required to run the game):
-# Used to produce a standalone Windows .exe. Install with:
-#   pip install -r requirements.txt
+# pyinstaller — produces a standalone Windows .exe (see build_exe.md).
+# pillow      — only needed to regenerate the app icon via make_icon.py.
+# Install the dev tools with:  pip install pyinstaller pillow
 # pyinstaller>=6.0
+# pillow>=10.0

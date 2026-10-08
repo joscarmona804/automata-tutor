@@ -26,6 +26,7 @@ Only the Python standard library is used (Tkinter).
 from __future__ import annotations
 
 import math
+import os
 import sys
 import tkinter as tk
 from tkinter import ttk, simpledialog, messagebox
@@ -57,6 +58,16 @@ def enable_hidpi() -> None:
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
+
+
+def resource_path(name: str) -> str:
+    """Absolute path to a bundled resource.
+
+    Works both when running from source and when frozen by PyInstaller, which
+    unpacks data files into a temp dir exposed as ``sys._MEIPASS``.
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, name)
 
 
 DIFFICULTY_NAMES = {
@@ -102,6 +113,7 @@ class AutomataTutor(tk.Tk):
         self.T: themes.Theme = themes.get_theme(self.theme_name.get())
 
         self.title("Automata Tutor — learn DFAs, NFAs & regex by playing")
+        self._set_window_icon()
         w, h = int(1300 * self.ui_scale), int(840 * self.ui_scale)
         self.geometry(f"{w}x{h}")
         self.minsize(int(1060 * self.ui_scale), int(700 * self.ui_scale))
@@ -142,6 +154,30 @@ class AutomataTutor(tk.Tk):
         self.show_campaign()
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ================================================================== #
+    # Window icon
+    # ================================================================== #
+    def _set_window_icon(self) -> None:
+        """Set the title-bar / taskbar icon, if the asset is present.
+
+        Uses the multi-size .ico on Windows and falls back to the .png
+        (kept as an attribute so Tk doesn't garbage-collect the image).
+        Any failure is non-fatal — the app still runs without an icon.
+        """
+        ico = resource_path("icon.ico")
+        png = resource_path("icon.png")
+        if sys.platform == "win32" and os.path.exists(ico):
+            try:
+                self.iconbitmap(default=ico)
+            except tk.TclError:
+                pass
+        if os.path.exists(png):
+            try:
+                self._icon_image = tk.PhotoImage(file=png)
+                self.iconphoto(True, self._icon_image)
+            except tk.TclError:
+                pass
 
     # ================================================================== #
     # Theme handling
