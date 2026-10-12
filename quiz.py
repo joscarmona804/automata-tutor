@@ -58,6 +58,23 @@ class Problem:
     points: int = 100
     # short Sipser reference, e.g. "Sipser §1.1" (cited, not quoted).
     sipser_ref: Optional[str] = None
+    # ---- Chapter / curriculum ----------------------------------------
+    # chapter id this problem belongs to (see curriculum.CHAPTERS).
+    # Defaults keep older code working; curriculum.py assigns real values.
+    chapter: str = "dfa"
+    # Ordering within a chapter (lower = earlier). Ties fall back to the
+    # order problems appear in PROBLEMS.
+    order: int = 0
+    # ---- Conversion problems -----------------------------------------
+    # For "convert X to Y" tasks: a spec of the GIVEN source automaton the
+    # player must translate. None for ordinary build-from-a-description
+    # problems. Shape (all keys optional except states/transitions/start):
+    #   {"states": ["A","B"], "start": "A", "accept": ["B"],
+    #    "transitions": [["A","0","B"], ["A","ε","B"], ...]}
+    # When present, `membership` should equal the source automaton's language
+    # and `conversion_target` names what the player must build ("DFA"/"NFA").
+    source_spec: Optional[dict] = None
+    conversion_target: Optional[str] = None
 
 
 # ---------------------------------------------------------------------- #
@@ -148,6 +165,19 @@ def _zeros(w: str) -> int:
     return w.count("0")
 
 
+def _match_0s1s0s(w: str) -> bool:
+    """True iff w matches 0*1*0* (zeros, then ones, then zeros)."""
+    i = 0
+    n = len(w)
+    while i < n and w[i] == "0":
+        i += 1
+    while i < n and w[i] == "1":
+        i += 1
+    while i < n and w[i] == "0":
+        i += 1
+    return i == n
+
+
 BIN = ["0", "1"]
 
 
@@ -181,6 +211,8 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=10,
     ),
     # 2 ---------------------------------------------------------------- #
     Problem(
@@ -205,6 +237,8 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=20,
     ),
     # 3 ---------------------------------------------------------------- #
     Problem(
@@ -238,6 +272,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=130,
     ),
     # 4 ---------------------------------------------------------------- #
     Problem(
@@ -263,6 +299,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=60,
     ),
     # 5 ---------------------------------------------------------------- #
     Problem(
@@ -291,6 +329,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=70,
     ),
     # 6 ---------------------------------------------------------------- #
     Problem(
@@ -319,6 +359,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=80,
     ),
     # 7 ---------------------------------------------------------------- #
     Problem(
@@ -346,6 +388,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=90,
     ),
     # 8 ---------------------------------------------------------------- #
     Problem(
@@ -372,6 +416,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=100,
     ),
     # 9 ---------------------------------------------------------------- #
     Problem(
@@ -398,6 +444,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=110,
     ),
     # 10 --------------------------------------------------------------- #
     Problem(
@@ -426,6 +474,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=140,
     ),
     # 11 --------------------------------------------------------------- #
     Problem(
@@ -459,6 +509,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=150,
     ),
     # 12 --------------------------------------------------------------- #
     Problem(
@@ -488,6 +540,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=160,
     ),
     # 13 --------------------------------------------------------------- #
     Problem(
@@ -515,6 +569,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=180,
     ),
     # 14 --------------------------------------------------------------- #
     Problem(
@@ -547,6 +603,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=190,
     ),
     # 15 --------------------------------------------------------------- #
     Problem(
@@ -584,6 +642,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=70,
     ),
     # 16 --------------------------------------------------------------- #
     Problem(
@@ -619,6 +679,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=80,
     ),
     # 17 --------------------------------------------------------------- #
     Problem(
@@ -658,6 +720,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=90,
     ),
     # 18 --------------------------------------------------------------- #
     Problem(
@@ -712,6 +776,8 @@ PROBLEMS: List[Problem] = [
         difficulty=5,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=100,
     ),
     # 19 --------------------------------------------------------------- #
     Problem(
@@ -766,6 +832,8 @@ PROBLEMS: List[Problem] = [
         difficulty=5,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=110,
     ),
     # 20 --------------------------------------------------------------- #
     Problem(
@@ -792,6 +860,8 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=30,
     ),
     # 21 --------------------------------------------------------------- #
     Problem(
@@ -823,6 +893,8 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=40,
     ),
     # 22 --------------------------------------------------------------- #
     Problem(
@@ -850,6 +922,8 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=50,
     ),
     # 23 --------------------------------------------------------------- #
     Problem(
@@ -875,6 +949,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=120,
     ),
     # 24 --------------------------------------------------------------- #
     Problem(
@@ -905,6 +981,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=170,
     ),
     # 25 --------------------------------------------------------------- #
     Problem(
@@ -939,6 +1017,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=20,
     ),
     # 26 --------------------------------------------------------------- #
     Problem(
@@ -974,6 +1054,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=30,
     ),
     # 27 --------------------------------------------------------------- #
     Problem(
@@ -1008,6 +1090,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=50,
     ),
     # 28 --------------------------------------------------------------- #
     Problem(
@@ -1044,6 +1128,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=40,
     ),
     # 29 --------------------------------------------------------------- #
     Problem(
@@ -1085,6 +1171,8 @@ PROBLEMS: List[Problem] = [
         difficulty=4,
         points=250,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=60,
     ),
     # 30 --------------------------------------------------------------- #
     Problem(
@@ -1124,6 +1212,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.2",
+        chapter="nfa",
+        order=20,
     ),
     # 31 --------------------------------------------------------------- #
     Problem(
@@ -1161,6 +1251,8 @@ PROBLEMS: List[Problem] = [
         difficulty=3,
         points=180,
         sipser_ref="Sipser §1.2",
+        chapter="nfa",
+        order=30,
     ),
     # 32 --------------------------------------------------------------- #
     Problem(
@@ -1192,6 +1284,8 @@ PROBLEMS: List[Problem] = [
         difficulty=2,
         points=120,
         sipser_ref="Sipser §1.2",
+        chapter="nfa",
+        order=10,
     ),
     # 33 --------------------------------------------------------------- #
     Problem(
@@ -1221,6 +1315,454 @@ PROBLEMS: List[Problem] = [
         difficulty=1,
         points=80,
         sipser_ref="Sipser §1.1",
+        chapter="dfa",
+        order=10,
+    ),
+    # 34 --------------------------------------------------------------- #
+    Problem(
+        key="nfa_contains_01",
+        kind="NFA",
+        title="Contains substring 01",
+        prompt="Build an NFA over {0,1} accepting strings that CONTAIN 01 as "
+               "a substring.",
+        alphabet=BIN,
+        membership=lambda s: "01" in s,
+        concept=(
+            "'Contains w' is the signature NFA pattern: a start state that "
+            "loops on every symbol guesses where the match begins, a short "
+            "chain reads w, and a looping accept state swallows the rest. "
+            "Any accepting path confirms the substring appears (Sipser §1.2)."
+        ),
+        strategy=(
+            "3-state NFA:\n"
+            "  S --0,1--> S      (loop, keep scanning)\n"
+            "  S --0--> q1       (guess 01 starts here)\n"
+            "  q1 --1--> ACC\n"
+            "  ACC --0,1--> ACC  (absorb the tail)\n"
+            "  Start = S,  Accept = {ACC}."
+        ),
+        example_accept=["01", "001", "010", "1101"],
+        example_reject=["", "0", "1", "10", "1100"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.2",
+        chapter="nfa",
+        order=40,
+    ),
+    # 35 --------------------------------------------------------------- #
+    Problem(
+        key="nfa_end_11_or_00",
+        kind="NFA",
+        title="Ends with 11 OR ends with 00",
+        prompt="Build an NFA over {0,1} accepting strings that END with 11 "
+               "OR END with 00.",
+        alphabet=BIN,
+        membership=lambda s: s.endswith("11") or s.endswith("00"),
+        concept=(
+            "Two suffix options become two guess-branches. The looping start "
+            "scans the string, then nondeterministically bets the final two "
+            "symbols are 11 (one branch) or 00 (the other). A wrong guess "
+            "lands short of the end and that path dies (Sipser §1.2)."
+        ),
+        strategy=(
+            "5-state NFA with a looping start and two length-2 chains:\n"
+            "  S --0,1--> S\n"
+            "  11-branch:  S --1--> p1 --1--> P   (P accepting)\n"
+            "  00-branch:  S --0--> q1 --0--> Q   (Q accepting)\n"
+            "  Start = S,  Accept = {P, Q}.\n"
+            "Only a branch whose two symbols line up with the very end of "
+            "input reaches an accepting state."
+        ),
+        example_accept=["11", "00", "011", "100", "1011"],
+        example_reject=["", "0", "1", "01", "10"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="nfa",
+        order=50,
+    ),
+    # 36 --------------------------------------------------------------- #
+    Problem(
+        key="eps_or_allsame",
+        kind="NFA",
+        title="All 0's OR all 1's (ε-union)",
+        prompt="Build an NFA that accepts strings made entirely of 0's OR "
+               "entirely of 1's (the empty string qualifies). Use an "
+               "ε-transition to branch between the two cases.",
+        alphabet=BIN,
+        membership=lambda s: set(s) <= {"0"} or set(s) <= {"1"},
+        concept=(
+            "ε-moves implement union: a fresh start fires a free edge into "
+            "each alternative. Here two tiny self-loop machines — one for 0*, "
+            "one for 1* — are glued under a common start by ε-edges "
+            "(Sipser §1.2)."
+        ),
+        strategy=(
+            "4-state ε-NFA:\n"
+            "  S --ε--> A      S --ε--> B      (S is also accepting for ε)\n"
+            "  A --0--> A      (A accepting: the 0* branch)\n"
+            "  B --1--> B      (B accepting: the 1* branch)\n"
+            "  Start = S,  Accept = {S, A, B}.\n"
+            "The two free ε-edges let one machine offer both languages; the "
+            "input commits to whichever branch it can follow."
+        ),
+        note=(
+            "The ε-edges carry no input, so the empty string stays in the "
+            "ε-closure {S, A, B} and is accepted."
+        ),
+        example_accept=["", "0", "1", "000", "111"],
+        example_reject=["01", "10", "001", "110"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.2",
+        chapter="epsilon",
+        order=10,
+    ),
+    # 37 --------------------------------------------------------------- #
+    Problem(
+        key="eps_zeros_then_ones",
+        kind="NFA",
+        title="0*1* glued with ε (0's then 1's)",
+        prompt="Build an NFA for 0*1* — any run of 0's followed by any run "
+               "of 1's — by gluing a 0-loop to a 1-loop with a single "
+               "ε-transition between them.",
+        alphabet=BIN,
+        membership=lambda s: "10" not in s,
+        concept=(
+            "ε is the glue for concatenation. Build a loop that eats 0's and "
+            "a loop that eats 1's, then connect the first to the second with "
+            "a free ε-edge. The machine reads zeros, slides across the ε "
+            "without consuming input, then reads ones (Sipser §1.2)."
+        ),
+        strategy=(
+            "2-state ε-NFA:\n"
+            "  A --0--> A           (eat leading 0's; A accepting)\n"
+            "  A --ε--> B           (free hop into the 1-phase)\n"
+            "  B --1--> B           (eat trailing 1's; B accepting)\n"
+            "  Start = A,  Accept = {A, B}.\n"
+            "Once you ε-move to B you can never read a 0 again, which is "
+            "exactly why no 1 is ever followed by a 0."
+        ),
+        note=(
+            "0*1* is precisely the strings with no '10' substring. The single "
+            "ε-edge enforces the one-way flow from the 0-phase to the "
+            "1-phase."
+        ),
+        example_accept=["", "0", "1", "0011", "00111"],
+        example_reject=["10", "100", "0101", "110"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.2",
+        chapter="epsilon",
+        order=20,
+    ),
+    # 38 --------------------------------------------------------------- #
+    Problem(
+        key="eps_01_star",
+        kind="NFA",
+        title="(01)* with an ε back-edge",
+        prompt="Build an NFA for (01)* — zero or more copies of the block "
+               "01 — using an ε back-edge to return to the start after each "
+               "complete 01.",
+        alphabet=BIN,
+        membership=lambda s: all(
+            len(s) % 2 == 0 and s[i:i + 2] == "01"
+            for i in range(0, len(s), 2)
+        ),
+        concept=(
+            "Kleene star is built with an ε back-edge: read one copy of the "
+            "block, then take a free ε-move back to the start so another "
+            "copy may follow. The start is accepting so zero copies (the "
+            "empty string) are allowed (Sipser §1.2)."
+        ),
+        strategy=(
+            "3-state ε-NFA:\n"
+            "  S --0--> q1          (start of one 01 block; S accepting)\n"
+            "  q1 --1--> q2\n"
+            "  q2 --ε--> S          (free jump back to try another block)\n"
+            "  Start = S,  Accept = {S}.\n"
+            "Acceptance needs the input to end exactly after a complete block "
+            "— back in S via the ε back-edge."
+        ),
+        note=(
+            "Only S accepts. The ε back-edge from q2 is what makes the block "
+            "repeatable without consuming extra input."
+        ),
+        example_accept=["", "01", "0101", "010101"],
+        example_reject=["0", "1", "10", "011", "0110"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="epsilon",
+        order=30,
+    ),
+    # 39 --------------------------------------------------------------- #
+    Problem(
+        key="eps_blocks_0_1_0",
+        kind="NFA",
+        title="0*1*0* chained by ε",
+        prompt="Build an NFA for 0*1*0* — some 0's, then some 1's, then some "
+               "0's — by chaining three self-loops with ε-transitions.",
+        alphabet=BIN,
+        membership=lambda s: _match_0s1s0s(s),
+        concept=(
+            "Concatenating three starred blocks is three self-loops joined by "
+            "two ε-edges. Each ε-edge is a one-way, input-free hop to the "
+            "next phase, so the phases happen in order (Sipser §1.2)."
+        ),
+        strategy=(
+            "3-state ε-NFA:\n"
+            "  A --0--> A    A --ε--> B      (first 0-block)\n"
+            "  B --1--> B    B --ε--> C      (middle 1-block)\n"
+            "  C --0--> C                    (final 0-block)\n"
+            "  Start = A,  Accept = {A, B, C}.\n"
+            "The two ε-edges let you slide A→B→C without reading input, so "
+            "any block may be empty."
+        ),
+        note=(
+            "Every state accepts, so you may stop in any phase; the ε-chain "
+            "fixes the left-to-right order 0's, then 1's, then 0's."
+        ),
+        example_accept=["", "0", "1", "010", "00110", "0010"],
+        example_reject=["101", "0101", "1010", "01010"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="epsilon",
+        order=40,
+    ),
+    # 40 --------------------------------------------------------------- #
+    Problem(
+        key="conv_nfa_contains_1",
+        kind="DFA",
+        title="Convert: NFA (contains a 1) → DFA",
+        prompt="You are GIVEN the NFA below. Build an equivalent DFA by the "
+               "subset construction. The NFA accepts exactly the strings "
+               "that contain at least one 1.",
+        alphabet=BIN,
+        membership=lambda s: "1" in s,
+        source_spec={
+            "states": ["A", "B"],
+            "start": "A",
+            "accept": ["B"],
+            "transitions": [
+                ["A", "0", "A"], ["A", "1", "B"],
+                ["B", "0", "B"], ["B", "1", "B"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "The subset construction makes each DFA state the SET of NFA "
+            "states currently possible. This source is already almost "
+            "deterministic, so the subsets you reach are just {A} and {B} "
+            "(Sipser §1.2)."
+        ),
+        strategy=(
+            "Reference DFA (2 states, the reachable subsets):\n"
+            "  d_A = {A}  (start)        d_B = {B}  (accepting)\n"
+            "  d_A --0--> d_A   d_A --1--> d_B\n"
+            "  d_B --0--> d_B   d_B --1--> d_B\n"
+            "  Start = d_A,  Accept = {d_B}."
+        ),
+        note=(
+            "Subset steps: start = {A}. On 0, A→A so stay {A}; on 1, A→B so "
+            "go to {B}. From {B} both symbols stay {B}. {B} accepts because "
+            "it contains the NFA accept state B. Two subsets are reachable."
+        ),
+        example_accept=["1", "01", "10", "111"],
+        example_reject=["", "0", "00", "000"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=10,
+    ),
+    # 41 --------------------------------------------------------------- #
+    Problem(
+        key="conv_nfa_eps_allsame",
+        kind="DFA",
+        title="Convert: ε-NFA (0* or 1*) → DFA",
+        prompt="You are GIVEN the ε-NFA below. Build an equivalent DFA by "
+               "the subset construction, remembering to take ε-closures. The "
+               "NFA accepts strings that are all 0's or all 1's.",
+        alphabet=BIN,
+        membership=lambda s: set(s) <= {"0"} or set(s) <= {"1"},
+        source_spec={
+            "states": ["S", "A", "B"],
+            "start": "S",
+            "accept": ["S", "A", "B"],
+            "transitions": [
+                ["S", "ε", "A"], ["S", "ε", "B"],
+                ["A", "0", "A"],
+                ["B", "1", "B"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "With ε-edges the DFA start is the ε-CLOSURE of the NFA start. "
+            "Here closure({S}) = {S, A, B}. From there each symbol commits to "
+            "one branch, and a dead subset {} handles a mixed string "
+            "(Sipser §1.2)."
+        ),
+        strategy=(
+            "Reference DFA (4 states):\n"
+            "  d0 = {S,A,B} (start, accept)   d0 --0--> dA   d0 --1--> dB\n"
+            "  dA = {A} (accept)              dA --0--> dA   dA --1--> dead\n"
+            "  dB = {B} (accept)              dB --0--> dead dB --1--> dB\n"
+            "  dead = {} (reject)             dead --0--> dead  dead --1--> dead\n"
+            "  Start = d0,  Accept = {d0, dA, dB}."
+        ),
+        note=(
+            "Start = ε-closure({S}) = {S,A,B} (accepting). On 0: only A has a "
+            "0-move (A→A), giving {A}; on 1: only B moves, giving {B}. From "
+            "{A} a 1 has no move → dead {}, and vice-versa. The dead subset "
+            "absorbs any string that mixes 0 and 1."
+        ),
+        example_accept=["", "0", "1", "000", "111"],
+        example_reject=["01", "10", "001", "110"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=20,
+    ),
+    # 42 --------------------------------------------------------------- #
+    Problem(
+        key="conv_regex_to_nfa_ends1",
+        kind="NFA",
+        title="Convert: regex (0|1)*1 → NFA",
+        prompt="Convert the regular expression (0|1)*1 into an NFA. The "
+               "language is all strings that END with 1. Build the NFA "
+               "(nondeterminism is fine).",
+        alphabet=BIN,
+        membership=lambda s: s.endswith("1"),
+        conversion_target="NFA",
+        concept=(
+            "regex→NFA glues per-operator machines. (0|1)* is a self-loop on "
+            "both symbols; concatenating the literal 1 appends one edge. The "
+            "clean NFA keeps the loop and guesses the final 1 (Sipser §1.2)."
+        ),
+        strategy=(
+            "2-state NFA:\n"
+            "  q0 --0,1--> q0     (the (0|1)* part: scan freely)\n"
+            "  q0 --1--> q1       (read the required final 1)\n"
+            "  Start = q0,  Accept = {q1}.\n"
+            "A string is accepted iff its last symbol is the guessed 1."
+        ),
+        note=(
+            "This mirrors Thompson's construction collapsed to its essentials: "
+            "the star becomes the self-loop, the trailing literal 1 becomes "
+            "the edge into the single accept state."
+        ),
+        example_accept=["1", "01", "11", "101", "001"],
+        example_reject=["", "0", "10", "00", "110"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=30,
+    ),
+    # 43 --------------------------------------------------------------- #
+    Problem(
+        key="conv_nfa_ends_1",
+        kind="DFA",
+        title="Convert: NFA (ends with 1) → DFA",
+        prompt="You are GIVEN the nondeterministic NFA below. Build an "
+               "equivalent DFA by the subset construction. The NFA guesses "
+               "the final symbol, accepting strings that END with 1.",
+        alphabet=BIN,
+        membership=lambda s: s.endswith("1"),
+        source_spec={
+            "states": ["A", "B"],
+            "start": "A",
+            "accept": ["B"],
+            "transitions": [
+                ["A", "0", "A"], ["A", "1", "A"], ["A", "1", "B"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "The source is genuinely nondeterministic: on 1 state A goes to "
+            "BOTH A and B. The subset construction tracks the possibility set "
+            "— after a 1 you could be in {A,B}, after a 0 only in {A} "
+            "(Sipser §1.2)."
+        ),
+        strategy=(
+            "Reference DFA (2 reachable subsets):\n"
+            "  dA = {A} (start, reject)      dAB = {A,B} (accept)\n"
+            "  dA  --0--> dA    dA  --1--> dAB\n"
+            "  dAB --0--> dA    dAB --1--> dAB\n"
+            "  Start = dA,  Accept = {dAB}."
+        ),
+        note=(
+            "Start = {A}. On 1, A→{A,B} (B is reachable), so {A,B} — "
+            "accepting because it holds B. On 0, both {A} and {A,B} drop B "
+            "(no 0-edge to B) and land in {A}. Only two subsets occur; {A,B} "
+            "means 'the last symbol was 1'."
+        ),
+        example_accept=["1", "01", "11", "101"],
+        example_reject=["", "0", "10", "00"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=40,
+    ),
+    # 44 --------------------------------------------------------------- #
+    Problem(
+        key="conv_nfa_contains_01",
+        kind="DFA",
+        title="Convert: NFA (contains 01) → DFA",
+        prompt="You are GIVEN the NFA below. Build an equivalent DFA by the "
+               "subset construction. The NFA accepts strings that CONTAIN "
+               "01 as a substring.",
+        alphabet=BIN,
+        membership=lambda s: "01" in s,
+        source_spec={
+            "states": ["A", "B", "C"],
+            "start": "A",
+            "accept": ["C"],
+            "transitions": [
+                ["A", "0", "A"], ["A", "1", "A"],
+                ["A", "0", "B"],
+                ["B", "1", "C"],
+                ["C", "0", "C"], ["C", "1", "C"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "The looping start A guesses where 01 begins (A→B on 0), B "
+            "confirms the following 1 (B→C), and C is an accepting sink. "
+            "Subset construction turns the overlapping guesses into a crisp "
+            "3-subset DFA (Sipser §1.2)."
+        ),
+        strategy=(
+            "Reference DFA (3 reachable subsets):\n"
+            "  dA  = {A}   (start, reject)\n"
+            "  dAB = {A,B} (reject; a 0 has been seen, mid-guess)\n"
+            "  dC  = {A,C} (accept; 01 already found, A still loops)\n"
+            "  dA  --0--> dAB   dA  --1--> dA\n"
+            "  dAB --0--> dAB   dAB --1--> dC\n"
+            "  dC  --0--> dC    dC  --1--> dC\n"
+            "  Start = dA,  Accept = {dC}."
+        ),
+        note=(
+            "Start {A}. On 0: A→A and A→B so {A,B}; on 1 from {A}: stay {A}. "
+            "From {A,B} a 1 fires B→C and A→A giving {A,C} (accept); a 0 keeps "
+            "{A,B}. From {A,C} C loops on both symbols (A also loops), so it "
+            "stays {A,C}. Any subset containing C accepts."
+        ),
+        example_accept=["01", "001", "010", "1101"],
+        example_reject=["", "0", "1", "10", "1100"],
+        difficulty=4,
+        points=250,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=50,
     ),
 ]
 

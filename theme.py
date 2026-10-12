@@ -40,6 +40,37 @@ class Theme:
 # "Midnight" reuses the exact hex values already baked into app.py so switching
 # to it is visually identical to the app's original look.
 THEMES: dict[str, "Theme"] = {
+    # "Arcade" — vibrant synthwave vibe: deep indigo/near-black backgrounds,
+    # electric magenta accent, cyan start, lime accept, warm amber active.
+    # Text is near-white for strong contrast on both bg and panel_bg.
+    "Arcade": Theme(
+        bg="#140d26",
+        canvas_bg="#1b1140",
+        state_fill="#2e1f63",
+        state_active="#ffb340",
+        state_outline="#c7b8ff",
+        start_color="#28e0e0",
+        accept_color="#8be34a",
+        edge_color="#c7b8ff",
+        text_color="#f4f0ff",
+        panel_bg="#231652",
+        accent="#ff3fd4",
+    ),
+    # "Bubblegum" — playful pastel light theme; dark ink text keeps AA contrast
+    # on the soft pink/cream backgrounds while accents stay candy-bright.
+    "Bubblegum": Theme(
+        bg="#fff0f6",
+        canvas_bg="#ffffff",
+        state_fill="#ffe0ef",
+        state_active="#ff8a3d",
+        state_outline="#7a3b63",
+        start_color="#0d8f9c",
+        accept_color="#2f8f3a",
+        edge_color="#5a3450",
+        text_color="#2b1522",
+        panel_bg="#ffe3f1",
+        accent="#d61f8f",
+    ),
     "Midnight": Theme(
         bg="#1e1f29",
         canvas_bg="#262732",
@@ -94,7 +125,7 @@ THEMES: dict[str, "Theme"] = {
     ),
 }
 
-DEFAULT_THEME = "Midnight"
+DEFAULT_THEME = "Arcade"
 
 
 def get_theme(name: str) -> Theme:
@@ -115,6 +146,35 @@ def _is_hex_color(value: str) -> bool:
     return True
 
 
+def _channel_luminance(c: float) -> float:
+    """Linearize a single 0..1 sRGB channel (per WCAG 2.x)."""
+    return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(hex_color: str) -> float:
+    """Relative luminance (0..1) of a ``#rrggbb`` color, per WCAG 2.x."""
+    r = int(hex_color[1:3], 16) / 255.0
+    g = int(hex_color[3:5], 16) / 255.0
+    b = int(hex_color[5:7], 16) / 255.0
+    return (
+        0.2126 * _channel_luminance(r)
+        + 0.7152 * _channel_luminance(g)
+        + 0.0722 * _channel_luminance(b)
+    )
+
+
+def _contrast_ratio(fg: str, bg: str) -> float:
+    """WCAG contrast ratio between two colors (ranges 1.0 .. 21.0)."""
+    l1 = _relative_luminance(fg)
+    l2 = _relative_luminance(bg)
+    lighter, darker = max(l1, l2), min(l1, l2)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+# WCAG AA threshold for normal-size text.
+AA_CONTRAST = 4.5
+
+
 if __name__ == "__main__":
     assert DEFAULT_THEME in THEMES, "DEFAULT_THEME must name a real theme"
     for theme_name, theme in THEMES.items():
@@ -124,5 +184,22 @@ if __name__ == "__main__":
             assert _is_hex_color(color), (
                 f"{theme_name}.{f.name} = {color!r} is not a #rrggbb hex color"
             )
+        # Text must stay readable on both the window and panel backgrounds.
+        bg_ratio = _contrast_ratio(theme.text_color, theme.bg)
+        panel_ratio = _contrast_ratio(theme.text_color, theme.panel_bg)
+        print(f"  text/bg    contrast = {bg_ratio:.2f}:1")
+        print(f"  text/panel contrast = {panel_ratio:.2f}:1")
+        assert bg_ratio >= AA_CONTRAST, (
+            f"{theme_name}: text_color vs bg contrast {bg_ratio:.2f} "
+            f"< {AA_CONTRAST} (WCAG AA)"
+        )
+        assert panel_ratio >= AA_CONTRAST, (
+            f"{theme_name}: text_color vs panel_bg contrast {panel_ratio:.2f} "
+            f"< {AA_CONTRAST} (WCAG AA)"
+        )
     assert get_theme("does-not-exist") is THEMES[DEFAULT_THEME]
-    print(f"\nOK — {len(THEMES)} themes, all fields are valid #rrggbb hex.")
+    print(
+        f"\nOK — {len(THEMES)} themes, all fields valid #rrggbb hex, "
+        f"all text contrast >= {AA_CONTRAST}:1 (WCAG AA)."
+    )
+    print(f"Default theme: {DEFAULT_THEME}")
