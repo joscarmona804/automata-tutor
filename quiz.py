@@ -1764,6 +1764,449 @@ PROBLEMS: List[Problem] = [
         chapter="convert",
         order=50,
     ),
+
+    # ================================================================== #
+    # EXTRA DRILLS (added for exam practice)
+    # ================================================================== #
+
+    # ---- regex -> NFA conversion drills (chapter: convert) -----------
+    # 45
+    Problem(
+        key="conv_regex_to_nfa_0star",
+        kind="NFA",
+        title="Convert: regex 0* → NFA",
+        prompt="Convert the regular expression 0* into an NFA. The language "
+               "is all strings of zero or more 0s (so no 1 may appear).",
+        alphabet=BIN,
+        membership=lambda s: set(s) <= {"0"},
+        conversion_target="NFA",
+        concept=(
+            "Kleene star on a single symbol is just a self-loop. The start "
+            "state is already accepting so the empty string ε is accepted "
+            "(zero repetitions), and each 0 loops back (Sipser §1.3)."
+        ),
+        strategy=(
+            "1-state NFA:\n"
+            "  q0 --0--> q0     (loop on 0)\n"
+            "  Start = q0,  Accept = {q0}.\n"
+            "No edge on 1, so any 1 kills the run — exactly 0* ."
+        ),
+        note="Star => the accepting start loops on the symbol; ε is in 0*.",
+        example_accept=["", "0", "00", "000"],
+        example_reject=["1", "01", "10", "11"],
+        difficulty=1,
+        points=90,
+        sipser_ref="Sipser §1.3",
+        chapter="convert",
+        order=22,
+    ),
+    # 46
+    Problem(
+        key="conv_regex_to_nfa_01star",
+        kind="NFA",
+        title="Convert: regex 01* → NFA",
+        prompt="Convert the regular expression 01* into an NFA. The language "
+               "is a single 0 followed by zero or more 1s.",
+        alphabet=BIN,
+        membership=lambda s: len(s) >= 1 and s[0] == "0"
+        and set(s[1:]) <= {"1"},
+        conversion_target="NFA",
+        concept=(
+            "Concatenation chains machines: read the literal 0 to move "
+            "forward, then the star 1* becomes a self-loop on the second "
+            "state (Sipser §1.3)."
+        ),
+        strategy=(
+            "2-state NFA:\n"
+            "  q0 --0--> q1     (the leading literal 0)\n"
+            "  q1 --1--> q1     (the 1* self-loop)\n"
+            "  Start = q0,  Accept = {q1}.\n"
+            "q0 is NOT accepting, so the empty string is rejected (01* needs "
+            "at least the 0)."
+        ),
+        note="Literal => an edge that advances; star => a loop on the target.",
+        example_accept=["0", "01", "011", "0111"],
+        example_reject=["", "1", "00", "10", "010"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.3",
+        chapter="convert",
+        order=24,
+    ),
+    # 47
+    Problem(
+        key="conv_regex_to_nfa_starts1",
+        kind="NFA",
+        title="Convert: regex 1(0|1)* → NFA",
+        prompt="Convert the regular expression 1(0|1)* into an NFA. The "
+               "language is all strings that START with 1.",
+        alphabet=BIN,
+        membership=lambda s: s.startswith("1"),
+        conversion_target="NFA",
+        concept=(
+            "A leading literal fixes the first move; (0|1)* after it is a "
+            "self-loop that scans the rest freely (Sipser §1.3)."
+        ),
+        strategy=(
+            "2-state NFA:\n"
+            "  q0 --1--> q1          (required leading 1)\n"
+            "  q1 --0,1--> q1        ((0|1)* tail)\n"
+            "  Start = q0,  Accept = {q1}.\n"
+            "Only a first symbol of 1 can leave q0, so the string must start "
+            "with 1."
+        ),
+        note="Mirror of the 'ends with 1' NFA: pin the FIRST symbol, loop after.",
+        example_accept=["1", "10", "11", "100", "1101"],
+        example_reject=["", "0", "01", "00", "010"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.3",
+        chapter="convert",
+        order=26,
+    ),
+    # 48
+    Problem(
+        key="conv_regex_to_nfa_ends00",
+        kind="NFA",
+        title="Convert: regex (0|1)*00 → NFA",
+        prompt="Convert the regular expression (0|1)*00 into an NFA. The "
+               "language is all strings that END with 00.",
+        alphabet=BIN,
+        membership=lambda s: s.endswith("00"),
+        conversion_target="NFA",
+        concept=(
+            "The (0|1)* prefix is a self-loop that scans freely; then the "
+            "machine GUESSES the final 00 and reads two 0s into the accept "
+            "state (Sipser §1.2–§1.3)."
+        ),
+        strategy=(
+            "3-state NFA:\n"
+            "  q0 --0,1--> q0        ((0|1)* scan)\n"
+            "  q0 --0--> q1          (guess: first 0 of the final 00)\n"
+            "  q1 --0--> q2          (second 0)\n"
+            "  Start = q0,  Accept = {q2}.\n"
+            "Some guess survives iff the last two symbols are both 0."
+        ),
+        note=(
+            "Nondeterminism lets q0 both stay (loop) and peel off on 0; only "
+            "the branch that guesses the true final 00 reaches q2."
+        ),
+        example_accept=["00", "000", "100", "0100", "1100"],
+        example_reject=["", "0", "1", "01", "10", "001"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=28,
+    ),
+    # 49
+    Problem(
+        key="conv_regex_to_nfa_0s1s",
+        kind="NFA",
+        title="Convert: regex 0*1* → NFA (uses ε)",
+        prompt="Convert the regular expression 0*1* into an NFA using an "
+               "ε-transition to glue the two stars. The language is any "
+               "number of 0s followed by any number of 1s.",
+        alphabet=BIN,
+        membership=lambda s: "10" not in s,
+        conversion_target="NFA",
+        concept=(
+            "Concatenating two starred machines is the textbook use of an "
+            "ε-move: finish the 0* part, jump for free to the 1* part "
+            "(Sipser §1.2–§1.3)."
+        ),
+        strategy=(
+            "2-state NFA with one ε-edge:\n"
+            "  q0 --0--> q0          (the 0* block)\n"
+            "  q0 --ε--> q1          (free jump between the two stars)\n"
+            "  q1 --1--> q1          (the 1* block)\n"
+            "  Start = q0,  Accept = {q1}.\n"
+            "ε makes q1 reachable with no input, so ε and all-0 and all-1 "
+            "strings are accepted; a 0 after a 1 is impossible."
+        ),
+        note=(
+            "0*1* = (all 0s) then (all 1s); the only way to fail is a 0 "
+            "appearing after a 1, i.e. the substring 10."
+        ),
+        example_accept=["", "0", "1", "01", "0011", "00111"],
+        example_reject=["10", "100", "0101", "110"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=29,
+    ),
+    # 50
+    Problem(
+        key="conv_regex_to_nfa_01star_loop",
+        kind="NFA",
+        title="Convert: regex (01)* → NFA (uses ε)",
+        prompt="Convert the regular expression (01)* into an NFA. The "
+               "language is zero or more copies of the block 01.",
+        alphabet=BIN,
+        membership=lambda s: len(s) % 2 == 0
+        and all(s[i:i + 2] == "01" for i in range(0, len(s), 2)),
+        conversion_target="NFA",
+        concept=(
+            "Star of a multi-symbol block loops back to the start after each "
+            "full copy. Here the accepting start reads 0 then 1 and returns, "
+            "ready for another block (Sipser §1.3)."
+        ),
+        strategy=(
+            "2-state NFA (the start is the loop point):\n"
+            "  q0 --0--> q1\n"
+            "  q1 --1--> q0          (back-edge completes one '01' block)\n"
+            "  Start = q0,  Accept = {q0}.\n"
+            "q0 accepting gives ε (zero copies); you only return to q0 after a "
+            "complete 01, so partial blocks are rejected."
+        ),
+        note=(
+            "You could add an explicit ε back-edge instead; collapsing it to a "
+            "direct q1→q0 on 1 gives the same language more cleanly."
+        ),
+        example_accept=["", "01", "0101", "010101"],
+        example_reject=["0", "1", "10", "011", "0110", "00"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.3",
+        chapter="convert",
+        order=29,
+    ),
+
+    # ---- more NFA -> DFA subset-construction drills (chapter: convert)
+    # 51
+    Problem(
+        key="conv_nfa_contains_11",
+        kind="DFA",
+        title="Convert: NFA (contains 11) → DFA",
+        prompt="You are GIVEN the NFA below. Build an equivalent DFA by the "
+               "subset construction. The NFA accepts strings that CONTAIN 11 "
+               "as a substring.",
+        alphabet=BIN,
+        membership=lambda s: "11" in s,
+        source_spec={
+            "states": ["A", "B", "C"],
+            "start": "A",
+            "accept": ["C"],
+            "transitions": [
+                ["A", "0", "A"], ["A", "1", "A"],
+                ["A", "1", "B"],
+                ["B", "1", "C"],
+                ["C", "0", "C"], ["C", "1", "C"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "A loops on both symbols and also guesses the first 1 of the pair "
+            "(A→B). B needs an immediate 1 to reach the accepting sink C. "
+            "Subset construction collapses the guessing into three subsets "
+            "(Sipser §1.2)."
+        ),
+        strategy=(
+            "Reference DFA (3 reachable subsets):\n"
+            "  dA  = {A}   (start, reject — no 1 pending)\n"
+            "  dAB = {A,B} (reject — just saw a 1, 11 still possible)\n"
+            "  dAC = {A,C} (accept — 11 already found)\n"
+            "  dA  --0--> dA    dA  --1--> dAB\n"
+            "  dAB --0--> dA    dAB --1--> dAC\n"
+            "  dAC --0--> dAC   dAC --1--> dAC\n"
+            "  Start = dA,  Accept = {dAC}."
+        ),
+        note=(
+            "Track the possibility set. A 1 moves {A}→{A,B} (B is now live). "
+            "A second 1 fires B→C giving {A,C} (accept). A 0 from {A,B} loses "
+            "B (no 0-edge) back to {A}. Once C appears it loops forever."
+        ),
+        example_accept=["11", "011", "110", "1011", "111"],
+        example_reject=["", "0", "1", "01", "10", "101", "0100"],
+        difficulty=4,
+        points=250,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=55,
+    ),
+    # 52
+    Problem(
+        key="conv_nfa_ends_0",
+        kind="DFA",
+        title="Convert: NFA (ends with 0) → DFA",
+        prompt="You are GIVEN the nondeterministic NFA below. Build an "
+               "equivalent DFA by the subset construction. The NFA guesses "
+               "the final symbol, accepting strings that END with 0.",
+        alphabet=BIN,
+        membership=lambda s: s.endswith("0"),
+        source_spec={
+            "states": ["A", "B"],
+            "start": "A",
+            "accept": ["B"],
+            "transitions": [
+                ["A", "0", "A"], ["A", "1", "A"], ["A", "0", "B"],
+            ],
+            "alphabet": ["0", "1"],
+        },
+        conversion_target="DFA",
+        concept=(
+            "On 0, A goes to BOTH A and B — a guess that this 0 is the last "
+            "symbol. The subset construction tracks {A} vs {A,B} (Sipser "
+            "§1.2)."
+        ),
+        strategy=(
+            "Reference DFA (2 reachable subsets):\n"
+            "  dA  = {A}   (start, reject)      dAB = {A,B} (accept)\n"
+            "  dA  --0--> dAB   dA  --1--> dA\n"
+            "  dAB --0--> dAB   dAB --1--> dA\n"
+            "  Start = dA,  Accept = {dAB}."
+        ),
+        note=(
+            "{A,B} means 'the last symbol read was 0'. A 0 always produces it "
+            "(A→A and A→B); a 1 has no edge to B, so it drops back to {A}."
+        ),
+        example_accept=["0", "10", "00", "110", "010"],
+        example_reject=["", "1", "01", "11", "101"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.2",
+        chapter="convert",
+        order=45,
+    ),
+
+    # ---- extra regular-expression build drills (chapter: regex) ------
+    # 53
+    Problem(
+        key="re_starts_0",
+        kind="RE",
+        title="Starts with 0",
+        prompt="Strings over {0,1} that START with 0.",
+        alphabet=BIN,
+        membership=lambda s: s.startswith("0"),
+        reference_regex="0(0|1)*",
+        re_hints=[
+            "Pin the first symbol by writing the literal 0 first.",
+            "Then allow anything: (0|1)*.",
+        ],
+        concept=(
+            "A prefix condition writes the required start literally, then "
+            "allows any continuation with (0|1)* (Sipser §1.3)."
+        ),
+        strategy="Literal first symbol then free tail: 0(0|1)*.",
+        example_accept=["0", "00", "01", "0110"],
+        example_reject=["", "1", "10", "110"],
+        difficulty=1,
+        points=80,
+        sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=5,
+    ),
+    # 54
+    Problem(
+        key="re_contains_11",
+        kind="RE",
+        title="Contains 11",
+        prompt="Strings over {0,1} that CONTAIN 11 as a substring.",
+        alphabet=BIN,
+        membership=lambda s: "11" in s,
+        reference_regex="(0|1)*11(0|1)*",
+        re_hints=[
+            "'contains X' = anything, then X, then anything.",
+            "Sandwich the literal 11 between two (0|1)* factors.",
+        ],
+        concept=(
+            "The universal 'contains w' pattern is (Σ)* w (Σ)*; the stars "
+            "absorb whatever surrounds the required 11 (Sipser §1.3)."
+        ),
+        strategy="(0|1)*11(0|1)*.",
+        example_accept=["11", "011", "110", "1011"],
+        example_reject=["", "0", "1", "01", "1010"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=12,
+    ),
+    # 55
+    Problem(
+        key="re_len_exactly_3",
+        kind="RE",
+        title="Length exactly 3",
+        prompt="Strings over {0,1} whose LENGTH is exactly 3.",
+        alphabet=BIN,
+        membership=lambda s: len(s) == 3,
+        reference_regex="(0|1)(0|1)(0|1)",
+        re_hints=[
+            "Each position is a free symbol (0|1).",
+            "Exactly three positions, concatenated, no star.",
+        ],
+        concept=(
+            "An exact length is a fixed-length concatenation: one (0|1) per "
+            "position, with no star so the count cannot vary (Sipser §1.3)."
+        ),
+        strategy="Three free symbols in a row: (0|1)(0|1)(0|1).",
+        example_accept=["000", "010", "111", "101"],
+        example_reject=["", "0", "00", "0000", "1"],
+        difficulty=2,
+        points=120,
+        sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=11,
+    ),
+    # 56
+    Problem(
+        key="re_start1_end0",
+        kind="RE",
+        title="Starts with 1 and ends with 0",
+        prompt="Strings over {0,1} that START with 1 AND END with 0 "
+               "(so length ≥ 2).",
+        alphabet=BIN,
+        membership=lambda s: len(s) >= 2 and s[0] == "1" and s[-1] == "0",
+        reference_regex="1(0|1)*0",
+        re_hints=[
+            "Pin both ends with literals: 1 at the front, 0 at the back.",
+            "Anything may sit between them: (0|1)*.",
+        ],
+        concept=(
+            "Fix the first and last symbols as literals and let the middle "
+            "vary with (0|1)*. Length is forced to at least 2 (Sipser §1.3)."
+        ),
+        strategy="1 then free middle then 0: 1(0|1)*0.",
+        example_accept=["10", "100", "110", "1010"],
+        example_reject=["", "1", "0", "11", "01", "010"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=13,
+    ),
+    # 57
+    Problem(
+        key="re_no_00",
+        kind="RE",
+        title="Does NOT contain 00",
+        prompt="Strings over {0,1} that do NOT contain 00 as a substring.",
+        alphabet=BIN,
+        membership=lambda s: "00" not in s,
+        reference_regex="(1|01)*(0|ε)",
+        re_hints=[
+            "If 00 is forbidden, every 0 must be followed by a 1 — unless it "
+            "is the very last symbol.",
+            "Build from blocks '1' and '01' (a 0 always paired with a "
+            "following 1): (1|01)*.",
+            "Allow one optional trailing lone 0 at the end: (0|ε).",
+        ],
+        concept=(
+            "Forbidding 00 means no two 0s are adjacent: every 0 is glued to a "
+            "following 1, except possibly a single 0 at the very end "
+            "(Sipser §1.3)."
+        ),
+        strategy="Blocks of 1 or 01, then an optional final 0: (1|01)*(0|ε).",
+        example_accept=["", "0", "1", "01", "10", "0101", "110"],
+        example_reject=["00", "100", "001", "1001", "000"],
+        difficulty=3,
+        points=180,
+        sipser_ref="Sipser §1.3",
+        chapter="regex",
+        order=14,
+    ),
 ]
 
 
