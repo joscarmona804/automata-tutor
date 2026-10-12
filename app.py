@@ -41,6 +41,10 @@ import game
 import theme as themes
 import lessons
 import examprep
+import coach
+import juice
+import askbot
+import examples
 
 
 # ---------------------------------------------------------------------- #
@@ -142,6 +146,10 @@ class AutomataTutor(tk.Tk):
         self.apply_theme()
         self.show_home()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # First-time players: offer the walkthrough automatically.
+        if not self.gs.solved and self.gs.total_xp == 0:
+            self.after(400, self.start_tutorial)
 
     # ------------------------------------------------------------------ #
     # Window icon
@@ -325,6 +333,22 @@ class AutomataTutor(tk.Tk):
         self.cheat.tkraise()
         self._pop()
 
+    def start_tutorial(self) -> None:
+        """Run the guided first-time walkthrough on the Play screen."""
+        # Load the gentlest DFA problem as the practice sandbox.
+        first = None
+        for p in PROBLEMS:
+            if p.chapter == "dfa":
+                first = p
+                break
+        if first is None:
+            first = PROBLEMS[0]
+        self._return_chapter = "dfa"
+        self.play.load_problem(first)
+        self.play.tkraise()
+        self._pop()
+        self.play.run_tutorial()
+
     def back_from_play(self) -> None:
         if self._return_chapter:
             self.show_lesson(self._return_chapter)
@@ -372,6 +396,8 @@ class HomeScreen(tk.Frame):
         self.cards = tk.Frame(self)
         self.cards.grid(row=2, column=0)
         self._card_defs = [
+            ("🎓  How to Play", "A 60-second guided walkthrough of the "
+             "controls.", self.app.start_tutorial),
             ("📚  Learn", "Work through the five chapters, concept first.",
              self.app.show_campaign),
             ("📝  Exam Prep", "Timed mixed quiz. Find your weak spots fast.",
@@ -598,6 +624,13 @@ class PlayScreen(tk.Frame):
         self.app = app
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
+        # coach / rendering state
+        self._state_items: Dict[str, List[int]] = {}
+        self._coach_tone = "info"
+        self._tip_seed = 0
+        self._idle_job = None
+        self._trace_gen = 0  # bumped on load/clear to cancel stale animations
+        self._trace_job = None
 
         # top bar
         top = tk.Frame(self)
@@ -628,6 +661,7 @@ class PlayScreen(tk.Frame):
         self.actions = tk.Frame(self.left)
         self.actions.pack(fill="x", pady=6)
         for txt, cmd, style in [
+                ("👁 Show example answer", self.show_example, "TButton"),
                 ("Clear canvas", self.clear_canvas, "TButton"),
                 ("Simulate a word…", self.simulate_dialog, "TButton"),
                 ("Hint", self.give_hint, "TButton"),
@@ -642,13 +676,21 @@ class PlayScreen(tk.Frame):
         # center
         self.center = tk.Frame(self)
         self.center.grid(row=1, column=1, sticky="nsew", padx=6, pady=10)
-        self.center.rowconfigure(1, weight=1)
+        self.center.rowconfigure(2, weight=1)
         self.center.columnconfigure(0, weight=1)
+
+        # live coach bubble (play-first: this does the talking, not a wall of text)
+        self.coach_bubble = tk.Label(
+            self.center, text="", justify="left", anchor="w",
+            font=("Segoe UI Semibold", 12), padx=14, pady=10,
+            wraplength=int(560 * app.ui_scale))
+        self.coach_bubble.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+
         self.source_label = ttk.Label(self.center, text="", justify="left",
                                       wraplength=int(560 * app.ui_scale))
-        self.source_label.grid(row=0, column=0, sticky="w")
+        self.source_label.grid(row=1, column=0, sticky="w")
         self.canvas = tk.Canvas(self.center, highlightthickness=0, bd=0)
-        self.canvas.grid(row=1, column=0, sticky="nsew")
+        self.canvas.grid(row=2, column=0, sticky="nsew")
         self.canvas.bind("<Button-1>", self._on_canvas_click)
         self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
@@ -666,22 +708,53 @@ class PlayScreen(tk.Frame):
                        command=lambda s=sym: self._insert_re(s)).pack(
                 side="left", padx=1)
 
-        # right
+        # right — trace first (what's happening now), details tucked away
         self.right = tk.Frame(self, width=int(400 * app.ui_scale))
         self.right.grid(row=1, column=2, sticky="ns", padx=10, pady=10)
         self.right.grid_propagate(False)
-        ttk.Label(self.right, text="Explain", style="Head.TLabel").pack(
+
+        # Ask panel (offline help)
+        ttk.Label(self.right, text="Ask", style="Head.TLabel").pack(anchor="w")
+        askrow = tk.Frame(self.right)
+        askrow.pack(fill="x", pady=(2, 2))
+        self.ask_entry = tk.Entry(askrow, font=("Segoe UI", 11), bd=0,
+                                  highlightthickness=2)
+        self.ask_entry.pack(side="left", fill="x", expand=True, ipady=5)
+        self.ask_entry.bind("<Return>", lambda e: self._do_ask())
+        ttk.Button(askrow, text="Ask", width=5,
+                   command=self._do_ask).pack(side="left", padx=(4, 0))
+        self.ask_answer = tk.Text(self.right, width=48, height=7, wrap="word",
+                                  bd=0, highlightthickness=0, padx=10, pady=8)
+        self.ask_answer.pack(fill="x", pady=(2, 2))
+        self.ask_answer.configure(state="disabled")
+        self.ask_chips = tk.Frame(self.right)
+        self.ask_chips.pack(fill="x", pady=(0, 6))
+
+        ttk.Label(self.right, text="Live trace", style="Head.TLabel").pack(
             anchor="w")
-        self.explain = tk.Text(self.right, width=48, height=22, wrap="word",
-                               bd=0, highlightthickness=0, padx=10, pady=10)
-        self.explain.pack(fill="both", expand=True, pady=(4, 8))
-        self.explain.configure(state="disabled")
-        ttk.Label(self.right, text="Step-by-step trace",
-                  style="Head.TLabel").pack(anchor="w")
-        self.steplog = tk.Text(self.right, width=48, height=12, wrap="word",
+        self.steplog = tk.Text(self.right, width=48, height=10, wrap="word",
                                bd=0, highlightthickness=0, padx=10, pady=10)
         self.steplog.pack(fill="both", expand=True, pady=4)
         self.steplog.configure(state="disabled")
+
+        self.details_btn = ttk.Button(self.right, text="▾ Why? (show the "
+                                      "theory)", command=self._toggle_details)
+        self.details_btn.pack(anchor="w", pady=(8, 2))
+        self.explain = tk.Text(self.right, width=48, height=14, wrap="word",
+                               bd=0, highlightthickness=0, padx=10, pady=10)
+        self.explain.configure(state="disabled")
+        self._details_open = False
+
+    # tone -> (bg, fg) for the coach bubble, resolved against the theme
+    def _tone_colors(self, tone: str) -> Tuple[str, str]:
+        T = self.app.T
+        return {
+            "praise": (juice.shade(T.accept_color, 0.35), T.text_color),
+            "warn": ("#5a2740", "#ffd0dd"),
+            "hint": (juice.shade(T.start_color, 0.3), T.text_color),
+            "goal": (juice.shade(T.accent, 0.35), T.text_color),
+            "info": (T.panel_bg, T.text_color),
+        }.get(tone, (T.panel_bg, T.text_color))
 
     def restyle(self) -> None:
         T = self.app.T
@@ -689,13 +762,20 @@ class PlayScreen(tk.Frame):
                   self.center, self.re_frame, self.palette, self.right):
             f.configure(bg=T.bg)
         self.canvas.configure(bg=T.canvas_bg)
+        bg, fg = self._tone_colors(getattr(self, "_coach_tone", "info"))
+        self.coach_bubble.configure(bg=bg, fg=fg)
         self.source_label.configure(background=T.bg, foreground=T.start_color)
         self.re_entry.configure(bg=T.panel_bg, fg=T.text_color,
                                 insertbackground=T.text_color,
                                 highlightbackground=T.accent,
                                 highlightcolor=T.accent)
-        for txt, bg in ((self.explain, T.panel_bg), (self.steplog,
-                                                     T.canvas_bg)):
+        self.ask_entry.configure(bg=T.panel_bg, fg=T.text_color,
+                                 insertbackground=T.text_color,
+                                 highlightbackground=T.accent,
+                                 highlightcolor=T.accent)
+        self.ask_chips.configure(bg=T.bg)
+        for txt, bg in ((self.explain, T.panel_bg), (self.steplog, T.canvas_bg),
+                        (self.ask_answer, T.panel_bg)):
             txt.configure(bg=bg, fg=T.text_color)
             self._config_text_tags(txt)
 
@@ -711,12 +791,233 @@ class PlayScreen(tk.Frame):
         widget.tag_configure("mono", font=("Consolas", 10))
         widget.tag_configure("dim", foreground="#9893a5")
 
+    # ---- offline Ask help ----
+    def _do_ask(self, question: Optional[str] = None) -> None:
+        q = question if question is not None else self.ask_entry.get().strip()
+        if not q:
+            return
+        self.ask_entry.delete(0, "end")
+        self.ask_entry.insert(0, q)
+        ans = askbot.ask(q, self.app.current_problem)
+        self.ask_answer.configure(state="normal")
+        self.ask_answer.delete("1.0", "end")
+        self.ask_answer.insert("end", ans.text + "\n", "")
+        self.ask_answer.insert("end", f"\n— {ans.source}\n", "dim")
+        self.ask_answer.configure(state="disabled")
+        self._render_ask_chips(ans.followups)
+
+    def _render_ask_chips(self, questions) -> None:
+        T = self.app.T
+        for ch in self.ask_chips.winfo_children():
+            ch.destroy()
+        for q in (questions or [])[:3]:
+            tk.Button(self.ask_chips, text=q, bg=T.canvas_bg, fg=T.start_color,
+                      activebackground=T.accent, activeforeground=T.bg,
+                      relief="flat", bd=0, padx=8, pady=3,
+                      font=("Segoe UI", 8), wraplength=int(360 * self.app.ui_scale),
+                      justify="left", cursor="hand2",
+                      command=lambda qq=q: self._do_ask(qq)).pack(
+                anchor="w", pady=1)
+
+    def _seed_ask(self) -> None:
+        """Show starter questions when a problem loads."""
+        self.ask_answer.configure(state="normal")
+        self.ask_answer.delete("1.0", "end")
+        self.ask_answer.insert("end", "Stuck or curious? Type a question "
+                                      "above, or tap one:\n", "dim")
+        self.ask_answer.configure(state="disabled")
+        self._render_ask_chips(
+            askbot.suggested_questions(self.app.current_problem))
+
+    # ---- example answer picture ----
+    def show_example(self) -> None:
+        prob = self.app.current_problem
+        if not prob:
+            return
+        spec = examples.get_example(prob.key)
+        if not spec:
+            self._say(coach.CoachTip(
+                "No ready-made picture for this one — try 'Show solution'.",
+                "info"))
+            return
+        if prob.kind == "RE":
+            # RE problems have no canvas visible; flip to a read-only canvas view
+            self.re_frame.grid_remove()
+            self.canvas.grid(row=2, column=0, sticky="nsew")
+        self._draw_example_spec(spec)
+        cap = spec.get("caption", "")
+        self._say(coach.CoachTip("Here's one correct answer. " + cap, "info"))
+
+    def _draw_example_spec(self, spec: dict) -> None:
+        """Render a verified example automaton (read-only) on the canvas."""
+        self.canvas.delete("all")
+        self.canvas.update_idletasks()
+        w = self.canvas.winfo_width() or int(600 * self.app.ui_scale)
+        h = self.canvas.winfo_height() or int(400 * self.app.ui_scale)
+        pad = self.app.state_r + 20
+        T = self.app.T
+        r = self.app.state_r
+        pos = {}
+        for s in spec["states"]:
+            x = pad + s["x"] * (w - 2 * pad)
+            y = pad + s["y"] * (h - 2 * pad)
+            pos[s["name"]] = (x, y)
+        # edges first
+        grouped: Dict[Tuple[str, str], List[str]] = {}
+        for src, sym, dst in spec["transitions"]:
+            grouped.setdefault((src, dst), []).append(sym)
+        for (src, dst), syms in grouped.items():
+            label = ",".join(syms)
+            (x1, y1), (x2, y2) = pos[src], pos[dst]
+            if src == dst:
+                juice.draw_self_loop(self.canvas, x1, y1, r, label=label,
+                                     color=T.edge_color, text_color=T.text_color)
+            else:
+                juice.draw_edge(self.canvas, x1, y1, x2, y2, r, label=label,
+                                color=T.edge_color, text_color=T.text_color)
+        for s in spec["states"]:
+            x, y = pos[s["name"]]
+            juice.draw_state(self.canvas, x, y, r, label=s["name"],
+                             fill=T.state_fill, outline=T.state_outline,
+                             text_color=T.text_color,
+                             accept=s.get("accept", False),
+                             accept_color=T.accept_color,
+                             start=s.get("start", False),
+                             start_color=T.start_color, glow=False)
+
+    # ---- interactive tutorial ----
+    def run_tutorial(self) -> None:
+        """A short, click-through walkthrough of the controls."""
+        T = self.app.T
+        steps = [
+            ("👋 Welcome! This is your workspace. The box in the middle is the "
+             "canvas where you draw a machine. Let's learn the controls.",
+             None),
+            ("A STATE is a circle. With the 'Add state' tool selected (left), "
+             "click an empty spot on the canvas to drop one. Your first state "
+             "automatically becomes the START (it gets an arrow pointing in).",
+             ToolMode.ADD_STATE),
+            ("The START is where every run begins. An ACCEPTING state (drawn as "
+             "a DOUBLE circle) means 'yes, accepted'. Use 'Mark accept' and "
+             "click a state to toggle its double ring.",
+             ToolMode.TOGGLE_ACCEPT),
+            ("A TRANSITION is an arrow. Pick 'Add transition', click the source "
+             "state, then the target state, and type the symbol (0 or 1) it "
+             "reads. In a DFA every state needs one arrow per symbol.",
+             ToolMode.ADD_EDGE),
+            ("Press 'Simulate a word' to watch a token walk your machine and "
+             "see accept/reject. Press 'Check my answer' when you think it's "
+             "right — I'll test it and react.",
+             None),
+            ("Stuck? Type a question in the 'Ask' box on the right, or hit "
+             "'👁 Show example answer' to see a correct machine. That's it — "
+             "give it a try!",
+             None),
+        ]
+        self._tut_steps = steps
+        self._tut_i = 0
+        if not hasattr(self, "_tut_bar") or not self._tut_bar.winfo_exists():
+            self._tut_bar = tk.Frame(self.center, bg=T.accent)
+        self._tut_bar.grid(row=3, column=0, sticky="ew", pady=(6, 0))
+        self._tut_label = tk.Label(
+            self._tut_bar, text="", bg=T.accent, fg=T.bg, justify="left",
+            font=("Segoe UI Semibold", 11),
+            wraplength=int(560 * self.app.ui_scale))
+        self._tut_label.pack(side="left", padx=12, pady=8)
+        self._tut_next = tk.Button(
+            self._tut_bar, text="Next ▸", command=self._tutorial_next,
+            relief="flat", bg=T.bg, fg=T.accent, bd=0, padx=14, pady=5,
+            font=("Segoe UI Semibold", 10), cursor="hand2")
+        self._tut_next.pack(side="right", padx=10)
+        self._show_tutorial_step()
+
+    def _show_tutorial_step(self) -> None:
+        text, tool = self._tut_steps[self._tut_i]
+        self._tut_label.config(text=f"({self._tut_i + 1}/"
+                                    f"{len(self._tut_steps)})  {text}")
+        if tool:
+            self.app.tool.set(tool)
+        last = self._tut_i == len(self._tut_steps) - 1
+        self._tut_next.config(text="Got it ✓" if last else "Next ▸")
+
+    def _tutorial_next(self) -> None:
+        self._tut_i += 1
+        if self._tut_i >= len(self._tut_steps):
+            self._tut_bar.grid_remove()
+            self._say(coach.CoachTip("You're ready — build away!", "goal"))
+            return
+        self._show_tutorial_step()
+
+    # ---- live coach ----
+    def _say(self, tip) -> None:
+        """Show a CoachTip in the bubble; briefly highlight its focus state."""
+        if tip is None:
+            return
+        self._coach_tone = tip.tone
+        bg, fg = self._tone_colors(tip.tone)
+        self.coach_bubble.configure(text="🧑‍🏫  " + tip.text, bg=bg, fg=fg)
+        if getattr(tip, "focus_state", None) and \
+                tip.focus_state in self.app.automaton.states:
+            self.app._highlight = {tip.focus_state}
+            self.redraw()
+            self.after(900, self._clear_highlight)
+
+    def _clear_highlight(self) -> None:
+        self.app._highlight = set()
+        self.redraw()
+
+    def _coach_react(self, event: dict) -> None:
+        prob = self.app.current_problem
+        if not prob:
+            return
+        self._bump_idle()
+        tip = coach.react(prob, self.app.automaton, event, seed=self._tip_seed)
+        self._tip_seed += 1
+        if tip is not None:
+            self._say(tip)
+
+    def _bump_idle(self) -> None:
+        """Reset the idle timer; if the player pauses, offer a gentle nudge."""
+        if getattr(self, "_idle_job", None):
+            try:
+                self.after_cancel(self._idle_job)
+            except Exception:
+                pass
+        self._idle_job = self.after(9000, self._idle_nudge)
+
+    def _idle_nudge(self) -> None:
+        prob = self.app.current_problem
+        if not prob or not self.winfo_viewable():
+            return
+        tip = coach.react(prob, self.app.automaton, {"type": "idle"},
+                          seed=self._tip_seed)
+        self._tip_seed += 1
+        if tip is not None:
+            self._say(tip)
+        self._bump_idle()
+
+    def _toggle_details(self) -> None:
+        self._details_open = not self._details_open
+        if self._details_open:
+            self.explain.pack(fill="both", expand=True, pady=4)
+            self.details_btn.config(text="▴ Hide theory")
+        else:
+            self.explain.pack_forget()
+            self.details_btn.config(text="▾ Why? (show the theory)")
+
     # ---- load a problem ----
     def load_problem(self, prob: Problem) -> None:
         self.app.current_problem = prob
         self.app._hints_shown = 0
         self.app._had_wrong = False
         self.app._solved_this_visit = False
+        self._trace_gen += 1  # abort any in-flight trace animation
+        if getattr(self, "_trace_job", None):
+            try:
+                self.after_cancel(self._trace_job)
+            except Exception:
+                pass
+            self._trace_job = None
         self.clear_canvas(confirm=False)
         tag = f"[{curriculum.get_chapter(prob.chapter).cid.upper()} · {prob.kind}]"
         self.prompt_label.config(text=f"{tag}  {prob.prompt}")
@@ -737,18 +1038,27 @@ class PlayScreen(tk.Frame):
             self.canvas.grid_remove()
             self.tools_head.pack_forget()
             self.tools_frame.pack_forget()
-            self.re_frame.grid(row=1, column=0, sticky="new")
+            self.re_frame.grid(row=2, column=0, sticky="new")
             self.re_entry.delete(0, "end")
             self.re_entry.focus_set()
         else:
             self.re_frame.grid_remove()
-            self.canvas.grid(row=1, column=0, sticky="nsew")
+            self.canvas.grid(row=2, column=0, sticky="nsew")
             self.tools_head.pack(anchor="w", before=self.tools_frame)
             self.tools_frame.pack(fill="x", pady=(2, 8), before=self.actions)
 
+        # Theory is tucked behind the "Why?" button — play first.
         self._write_concept(prob)
-        self._set_log([("dim", "Build your answer, then press "
-                               "'Check my answer'.\n")])
+        if self._details_open:
+            self._toggle_details()
+        self._set_log([("dim", "Your move. The coach reacts as you build.\n")])
+
+        # Fire up the live coach.
+        self._tip_seed = 0
+        self._coach_tone = "goal"
+        self._say(coach.opening_tip(prob))
+        self._bump_idle()
+        self._seed_ask()
 
     def _show_source(self, prob: Problem) -> None:
         spec = prob.source_spec
@@ -881,14 +1191,19 @@ class PlayScreen(tk.Frame):
                     s.is_start = False
                 aut.states[hit].is_start = now
                 self.redraw()
+                if now:
+                    self._coach_react({"type": "mark_start", "name": hit})
         elif mode == ToolMode.TOGGLE_ACCEPT:
             if hit:
                 aut.states[hit].is_accept = not aut.states[hit].is_accept
                 self.redraw()
+                if aut.states[hit].is_accept:
+                    self._coach_react({"type": "mark_accept", "name": hit})
         elif mode == ToolMode.ERASE:
             if hit:
                 aut.remove_state(hit)
                 self.redraw()
+                self._coach_react({"type": "erase", "name": hit})
         elif mode == ToolMode.ADD_EDGE:
             if hit:
                 if self.app._edge_source is None:
@@ -916,6 +1231,11 @@ class PlayScreen(tk.Frame):
         is_start = (len(self.app.automaton.states) == 0)
         self.app.automaton.add_state(name, x=x, y=y, is_start=is_start)
         self.redraw()
+        # springy pop on the brand-new node
+        ids = self._state_items.get(name)
+        if ids:
+            juice.spring_pop(self.canvas, ids, x, y, self.after)
+        self._coach_react({"type": "add_state", "name": name})
 
     def _prompt_edge(self, src, dst):
         prob = self.app.current_problem
@@ -928,11 +1248,16 @@ class PlayScreen(tk.Frame):
             parent=self)
         if not ans:
             return
+        last_sym = None
         for sym in ans.strip().split(","):
             sym = sym.strip()
             if sym:
                 self.app.automaton.add_transition(src, sym, dst)
+                last_sym = sym
         self.redraw()
+        if last_sym is not None:
+            self._coach_react({"type": "add_edge", "src": src,
+                               "sym": last_sym, "dst": dst})
 
     def clear_canvas(self, confirm=True):
         if confirm and self.app.automaton.states:
@@ -950,6 +1275,7 @@ class PlayScreen(tk.Frame):
     # ---- drawing ----
     def redraw(self):
         self.canvas.delete("all")
+        self._state_items = {}
         self._draw_edges()
         for name, st in self.app.automaton.states.items():
             self._draw_state(name, st)
@@ -957,26 +1283,24 @@ class PlayScreen(tk.Frame):
     def _draw_state(self, name, st):
         T = self.app.T
         r = self.app.state_r
-        x, y = st.x, st.y
         active = name in self.app._highlight
-        fill = T.state_active if active else T.state_fill
-        outline = T.start_color if name == self.app._edge_source \
-            else T.state_outline
-        width = 3 if name == self.app._edge_source else 2
-        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=fill,
-                                outline=outline, width=width)
-        if st.is_accept:
-            r2 = r - self.app.accept_gap
-            self.canvas.create_oval(x - r2, y - r2, x + r2, y + r2,
-                                    outline=T.accept_color, width=2)
-        if st.is_start:
-            self.canvas.create_line(x - r - 26, y, x - r, y, fill=T.start_color,
-                                    width=2, arrow="last")
-        self.canvas.create_text(x, y, text=name, fill=T.text_color,
-                                font=("Segoe UI Semibold", 11))
+        is_edge_src = (name == self.app._edge_source)
+        outline = T.start_color if is_edge_src else T.state_outline
+        ids = juice.draw_state(
+            self.canvas, st.x, st.y, r,
+            label=name, fill=T.state_fill, outline=outline,
+            text_color=T.text_color,
+            accept=st.is_accept, accept_color=T.accept_color,
+            start=st.is_start, start_color=T.start_color,
+            active=active, active_color=T.state_active,
+            glow=active or is_edge_src,
+            glow_color=T.state_active if active else T.start_color)
+        self._state_items[name] = ids
 
     def _draw_edges(self):
         aut = self.app.automaton
+        T = self.app.T
+        r = self.app.state_r
         grouped: Dict[Tuple[str, str], List[str]] = {}
         for (src, sym), dsts in aut.transitions.items():
             for dst in dsts:
@@ -985,39 +1309,15 @@ class PlayScreen(tk.Frame):
             if src not in aut.states or dst not in aut.states:
                 continue
             label = ",".join(sorted(syms))
+            s, d = aut.states[src], aut.states[dst]
             if src == dst:
-                self._draw_self_loop(aut.states[src], label)
+                juice.draw_self_loop(self.canvas, s.x, s.y, r, label=label,
+                                     color=T.edge_color,
+                                     text_color=T.text_color)
             else:
-                self._draw_arrow(aut.states[src], aut.states[dst], label)
-
-    def _draw_arrow(self, s, d, label):
-        T = self.app.T
-        r = self.app.state_r
-        x1, y1, x2, y2 = s.x, s.y, d.x, d.y
-        ang = math.atan2(y2 - y1, x2 - x1)
-        sx, sy = x1 + r * math.cos(ang), y1 + r * math.sin(ang)
-        ex, ey = x2 - r * math.cos(ang), y2 - r * math.sin(ang)
-        mx = (sx + ex) / 2 + 14 * math.sin(ang)
-        my = (sy + ey) / 2 - 14 * math.cos(ang)
-        self.canvas.create_line(sx, sy, mx, my, ex, ey, smooth=True,
-                                fill=T.edge_color, width=2, arrow="last",
-                                arrowshape=(12, 14, 5))
-        self.canvas.create_text(mx + 6 * math.sin(ang), my - 6 * math.cos(ang),
-                                 text=label, fill=T.accent,
-                                 font=("Consolas", 11, "bold"))
-
-    def _draw_self_loop(self, s, label):
-        T = self.app.T
-        r = self.app.state_r
-        x, y = s.x, s.y
-        self.canvas.create_arc(x - r, y - r - r, x + r, y + r - r, start=250,
-                               extent=200, style="arc", outline=T.edge_color,
-                               width=2)
-        self.canvas.create_line(x + 8, y - r - 6, x + 14, y - r + 2,
-                                fill=T.edge_color, width=2, arrow="last",
-                                arrowshape=(10, 12, 4))
-        self.canvas.create_text(x, y - r - r - 6, text=label, fill=T.accent,
-                                font=("Consolas", 11, "bold"))
+                juice.draw_edge(self.canvas, s.x, s.y, d.x, d.y, r,
+                                label=label, color=T.edge_color,
+                                text_color=T.text_color)
 
     def _insert_re(self, sym):
         self.re_entry.insert("insert", sym)
@@ -1045,12 +1345,14 @@ class PlayScreen(tk.Frame):
             had_wrong_attempt=self.app._had_wrong)
         self.app.save()
         self.app._refresh_hud()
+        self._say(coach.celebrate_tip(outcome.stars))
         self._celebrate(outcome)
 
-    def _on_wrong(self):
+    def _on_wrong(self, counterexample=None):
         self.app._had_wrong = True
         self.app.gs.record_wrong_attempt(self.app.current_problem.key)
         self.app._refresh_hud()
+        self._say(coach.wrong_tip(counterexample))
 
     def _celebrate(self, outcome: game.SolveOutcome):
         stars = "★" * outcome.stars + "☆" * (3 - outcome.stars)
@@ -1172,31 +1474,50 @@ class PlayScreen(tk.Frame):
             self.app.automaton.alphabet = set(prob.alphabet)
         sim = self.app.automaton.simulate(word)
         disp = word or "ε"
-        chunks = [("h", f'Tracing "{disp}"\n')]
+        # Terse coach narration in the trace panel (minimal reading).
+        narration = coach.trace_narration(prob, self.app.automaton, word) \
+            if prob else [disp]
+        chunks = [("h", narration[0] + "\n")]
+        for line in narration[1:-1]:
+            chunks.append(("mono", line + "\n"))
+        verdict = narration[-1]
+        chunks.append(("ok", "\n" + verdict + "\n") if "ACCEPTED" in verdict
+                      else ("bad", "\n" + verdict + "\n"))
+        self._set_log(chunks)
         if sim.error:
-            chunks.append(("bad", sim.error + "\n"))
-            self._set_log(chunks)
+            self._say(coach.CoachTip("That word can't run — " + sim.error,
+                                     "warn"))
             self.app._highlight = set()
             self.redraw()
             return
-        for step in sim.steps:
-            if step.symbol:
-                chunks.append(("mono", f"[{step.index}] read '{step.symbol}'\n"))
-            else:
-                chunks.append(("mono", f"[{step.index}] start\n"))
-            chunks.append(("", f"    {step.note}\n"))
-        chunks.append(("ok", "\nResult: ACCEPTED ✓\n") if sim.accepted
-                      else ("bad", "\nResult: REJECTED ✗\n"))
-        self._set_log(chunks)
+        self._say(coach.CoachTip(
+            f'Watch the token walk "{disp}".', "info"))
         self._animate_trace(sim)
 
     def _animate_trace(self, sim):
+        # Walk the token through each configuration's active set, narrating.
+        gen = self._trace_gen
+
         def show(i):
+            if gen != self._trace_gen:
+                return  # a new problem/clear happened; abandon this trace
             if i >= len(sim.steps):
+                final = "ACCEPTED ✓" if sim.accepted else "REJECTED ✗"
+                self._say(coach.CoachTip(
+                    final, "praise" if sim.accepted else "warn"))
                 return
-            self.app._highlight = set(sim.steps[i].after)
+            step = sim.steps[i]
+            self.app._highlight = set(step.after)
             self.redraw()
-            self.after(550, lambda: show(i + 1))
+            # pulse the active states for a lively "token here" feel
+            for name in step.after:
+                ids = self._state_items.get(name)
+                if ids:
+                    juice.pulse(self.canvas, ids[:1], self.after,
+                                color_from=self.app.T.state_active,
+                                color_to=self.app.T.accent, cycles=1,
+                                duration_ms=300)
+            self._trace_job = self.after(650, lambda: show(i + 1))
         if sim.steps:
             show(0)
 
